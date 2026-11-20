@@ -1,0 +1,54 @@
+# The paper method on DCH (cluster counting): the same pipeline as paper/dro.yaml; what differs between the two
+# tasks is only what is written here. As-run values where the keys can express them, not re-tuned.
+defaults: ../teacher.yaml
+task: dch
+data:
+  set: dch_wf
+  config: pion
+stages: [ssl, ridge, student, compress]
+
+model:
+  version: "2.5"
+  blocks: pretrained
+  scaling: trace_native      # each waveform standardised, then TimesFM's causal per-patch scaling
+  adapter: true
+
+ssl:
+  epochs: 3                  # 93 750 steps of 16 on the 500 000 dev waveforms
+  batch_size: 16
+  schedule: cosine
+  final_lr_frac: 0.0
+  target_space: input        # targets and mask token are the encoder's own scaled patches
+
+ridge:
+  standardise_on: labelled
+  log10_alpha_min: -1.0      # as run: alpha in 0.1, 1, ..., 1e5
+  log10_alpha_max: 5.0
+  alphas_per_decade: 1
+
+student:
+  targets: teacher
+  hidden: [16, 24, 8]
+  pad_to: 3008               # 3000 samples padded to 3008, every 5th: 602
+  every: 5
+  n_in: 602
+  input_scaling: kept_minmax
+  target_scaling: divisor
+  divisors: [53.0]
+  loss_weights: [0.02809]    # 53^2 * 1e-5
+  output_bias: mean
+  lr: 1.0e-3
+  steps: 600000              # as run: an upper bound; the rate was held, then halved in steps (which no key expresses)
+  batch_size: 64
+  keep: best_val
+  eval_every: 50
+
+compress:                    # 50 % of every layer pruned, power-of-two weights, 12-bit biases and activations
+  kernel: ["quantized_po2(10)", "quantized_po2(10)", "quantized_po2(10)", "quantized_po2(10)"]
+  bias: "quantized_bits(12,2,symmetric=1)"
+  activation: "quantized_relu(12,2)"
+  sparsity: [0.5, 0.5, 0.5, 0.5]
+  prune_steps: 26370         # 30 epochs of ceil(450 000 / 512) = 879 batches (as run: an upper bound, early stopping)
+  steps: 43950               # 50 epochs (likewise)
+  batch_size: 512
+  lr: 1.0e-4

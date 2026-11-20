@@ -1,0 +1,6 @@
+# PWO, random C and S, ideal sensor: the realistic set with every sensor and electronics effect off (no dark
+# counts, every photoelectron exactly one spe_amplitude, no crosstalk, no white noise). Same seed and draws.
+defaults: _base.yaml
+crystal: pwo
+noise: {dark_rate_hz: 0.0, spe_sigma: 0.0, crosstalk: 0.0, electronic_spe: 0.0}
+out: /path/to/wavefm-data/dro_gen/pwo_ideal

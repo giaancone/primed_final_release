@@ -1,0 +1,10 @@
+# DRO, 2-layer method: TimesFM 2.5, the last two blocks and the head trained (PRIMED), on the paper's PWO set.
+# The rate and the length are not tuned on this data set: scan them once (configs/scans_dev/README.md), then fix them here.
+defaults: teacher.yaml
+task: dro
+data:
+  set: dro_gen
+  config: pwo_realistic
+stages: [finetune]
+finetune:
+  epochs: 10

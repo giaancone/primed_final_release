@@ -1,0 +1,6 @@
+# Control: the paper method with a transformer that is NOT pretrained (random weights, frozen; the tokenizer starts
+# random too). What the pretraining of the blocks contributes is the difference to paper/dch.yaml.
+defaults: dch.yaml
+stages: [ssl, ridge]
+model:
+  blocks: random

@@ -1,0 +1,8 @@
+# A small slice of pion for smoke tests (a few minutes of SSL + ridge, not hours): the first 2500 events of the first
+# dev file and the first 500 of the first heldout file. Not a problem to report results on.
+defaults: pion.yaml
+files:
+  dev: [processed_data_train/batch_0.npz]
+  heldout: [processed_data_test/batch_0.npz]
+first_rows: {dev: 2500, heldout: 500}
+out: /path/to/wavefm-data/dch_wf/pion_smoke

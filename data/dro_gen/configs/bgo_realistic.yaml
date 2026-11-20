@@ -1,0 +1,6 @@
+# BGO, random C and S, realistic sensor effects (dark counts, photoelectron gain spread, crosstalk, white noise).
+defaults: _base.yaml
+crystal: bgo
+out: /path/to/wavefm-data/dro_gen/bgo_realistic
+# BGO is about 5.7 times brighter in scintillation light than BSO, so the scintillation range is wider.
+source: {s_max: 5100}

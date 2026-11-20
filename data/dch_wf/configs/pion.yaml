@@ -1,0 +1,13 @@
+# CEPC drift-chamber pion waveforms (Tian et al., arXiv:2402.16493, "peak-finding" samples), as npz files made by
+# DCH_wf/processor.ipynb. dev = training sample, heldout = testing sample; 500k pions each, 0.2-20 GeV/c.
+source: /path/to/wavefm-data/DCH_wf
+files:
+  dev: [processed_data_train/batch_0.npz, processed_data_train/batch_1.npz, processed_data_train/batch_2.npz,
+        processed_data_train/batch_3.npz, processed_data_train/batch_4.npz]
+  heldout: [processed_data_test/batch_0.npz, processed_data_test/batch_1.npz, processed_data_test/batch_2.npz,
+            processed_data_test/batch_3.npz, processed_data_test/batch_4.npz]
+members: {waveform: wf_i, tag_times: tag_times, tag_values: tag_values}
+dt_ns: 0.6666666666666666   # 1.5 GS/s: 3000 samples span the 2000 ns window of the paper
+t_first_ns: 0.0
+unit: a.u.                  # simulated induced current after the measured preamplifier response, no physical unit
+out: /path/to/wavefm-data/dch_wf/pion

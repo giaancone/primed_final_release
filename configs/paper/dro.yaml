@@ -1,0 +1,56 @@
+# The paper method on DRO (PWO, realistic sensor): label-free training of the tokenizer and adapter, closed-form
+# ridge on the frozen features, a 10 891-parameter student distilled from the teacher labels, pruning and
+# quantisation-aware training. Every option that is not the plain default is switched on here, with the value that
+# was run for the paper where the keys can express it (configs/paper/README.md lists what they cannot).
+# The training dynamics below are the as-run values; they were not re-tuned under the present protocol.
+defaults: ../teacher.yaml
+task: dro
+data:
+  set: dro_gen
+  config: pwo_realistic
+stages: [ssl, ridge, student, compress]
+
+model:
+  version: "2.5"
+  blocks: pretrained
+  scaling: global_minmax
+  adapter: true
+
+ssl:
+  epochs: 3                  # 15 000 steps of 16 on the 80 000 dev waveforms
+  batch_size: 16
+  schedule: cosine           # to zero, no warm-up
+  final_lr_frac: 0.0
+  target_space: zscore       # targets and mask token in the standardised waveform, not in the min-max input
+
+ridge:
+  standardise_on: dev        # feature mean and spread from every dev row
+
+student:
+  targets: teacher
+  hidden: [16, 24, 8]
+  pad_to: 6246               # 6246 samples, every 10th: 625, padded to 640
+  every: 10
+  n_in: 640
+  input_scaling: dev_minmax
+  target_scaling: standard
+  loss_weights: [1.0, 1.0, 0.01]     # C : S : t0
+  lr: 1.0e-2
+  steps: 800000
+  batch_size: 1024
+  schedule: cosine
+  warmup_frac: 0.05
+  keep: best_val             # as run: the best evaluation was kept (there on a smoothed loss against true labels)
+  eval_every: 4000
+
+compress:                    # operating point B of the paper: 70 % of the first layer pruned, 10 bits
+  # fix10 as run: 10 bits, integer bits ceil(log2 max|w|) per layer = 2 after the +-3.99 conditioning
+  kernel: ["quantized_po2(10)", "quantized_bits(10,2,symmetric=1,alpha=1)", "quantized_bits(10,2,symmetric=1,alpha=1)",
+           "quantized_bits(10,2,symmetric=1,alpha=1)"]
+  bias: "quantized_bits(10,2,symmetric=1)"
+  activation: "quantized_relu(10,2)"
+  sparsity: [0.7, 0.0, 0.0, 0.0]
+  prune_steps: 28200         # 200 epochs of ceil(72 000 / 512) = 141 batches
+  steps: 56400               # 400 epochs
+  batch_size: 512
+  lr: 3.0e-4

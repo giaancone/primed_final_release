@@ -1,0 +1,53 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "wavefm"
+version = "0.1.0"
+description = "Foundation models for real-time detector waveform readout"
+requires-python = ">=3.12"
+# torch / timesfm / numpy pinned to the versions the paper's results were produced with, so numerics do not drift
+dependencies = [
+    "torch==2.9.1",
+    "timesfm[torch]==3.0.2",
+    "numpy==2.5.5",
+    "h5py",
+    "pyyaml",
+    "safetensors",
+    "huggingface_hub",
+    "matplotlib",
+    "mplhep",
+    "uproot",
+]
+
+[dependency-groups]
+dev = ["pytest"]
+
+# three importable top-level packages: `wavefm` (src/wavefm, the solutions), `data` (data/, the problems) and
+# `analysis` (analysis/, reading and plotting results)
+[tool.setuptools]
+package-dir = { "" = "src", "data" = "data", "analysis" = "analysis" }
+
+[tool.setuptools.packages.find]
+where = ["src", "."]
+include = ["wavefm*", "data*", "analysis*"]
+
+[tool.uv]
+environments = ["sys_platform == 'linux' and platform_machine == 'x86_64'"]
+# write the .pyc files at install time, so a compute node never writes into the env on first import
+# (first-import .pyc writes into a parallel file system from a compute node were measured at up to 28 s each)
+compile-bytecode = true
+
+# CUDA 12.8 build of torch, as in the old env (torch==2.9.1+cu128)
+[tool.uv.sources]
+torch = { index = "pytorch-cu128" }
+
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["gpu: needs a GPU and the TimesFM weights"]

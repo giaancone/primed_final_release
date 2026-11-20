@@ -1,0 +1,4 @@
+# BSO, random C and S, realistic sensor effects (dark counts, photoelectron gain spread, crosstalk, white noise).
+defaults: _base.yaml
+crystal: bso
+out: /path/to/wavefm-data/dro_gen/bso_realistic

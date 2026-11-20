@@ -1,0 +1,18 @@
+# 36 k streaming CNN from scratch on DRO: the baseline, with the same data, input scaling and label budget as the
+# teachers. Trained to convergence (advanced options, switched on here): constant rate, x0.3 on each plateau of the
+# validation loss (20 evaluations = 4000 steps), stop at the third plateau, keep the best validation loss.
+defaults: teacher.yaml
+task: dro
+stages: [finetune]
+model:
+  kind: cnn
+  widths: [32, 64, 128]
+finetune:
+  steps: 300000              # cost bound only: the run ends on the third plateau
+  batch_size: 256
+  schedule: plateau
+  patience: 20
+  keep: best_val
+  eval_every: 200
+  lr_head: 1.0e-3            # the CNN has a single parameter group
+  weight_decay: 1.0e-4

@@ -1,0 +1,29 @@
+[project]
+name = "wavefm-compression"
+version = "0.1.0"
+description = "Pruning and quantisation-aware training of the WaveFM students (TensorFlow / QKeras)"
+requires-python = "==3.10.*"
+# pinned to the env the old compression scripts ran in (conda env qk310: python 3.10, tensorflow 2.15.1, keras 2.15.0,
+# QKeras 0.9.0, tfmot 0.7.5, numpy 1.26.4). QKeras and tfmot need Keras 2, i.e. TF <= 2.15 with its bundled keras 2.15.
+# [and-cuda] brings the CUDA 12.2 / cuDNN 8.9 libraries as pip wheels: no module load needed on the GPU cluster.
+dependencies = [
+    "tensorflow[and-cuda]==2.15.1",
+    "keras==2.15.0",
+    "qkeras==0.9.0",
+    "tensorflow-model-optimization==0.7.5",
+    "numpy==1.26.4",
+    "pyparsing==3.3.3",   # imported by qkeras but missing from its metadata (qk310 had 3.3.3)
+    "h5py",
+    "pyyaml",
+]
+
+[dependency-groups]
+dev = ["pytest"]
+
+[tool.uv]
+package = false
+environments = ["sys_platform == 'linux' and platform_machine == 'x86_64'"]
+compile-bytecode = true   # .pyc at install time: a compute node never writes into the env (see ../pyproject.toml)
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

@@ -1,0 +1,62 @@
+# Every parameter of a dro_gen data set (generate.py, build.py). The six data configs in this directory inherit this
+# file (`defaults: _base.yaml`) and set the crystal, the sensor effects and where they are written. Files starting
+# with `_` are not data sets. Build with   python scripts/prepare_data.py dro_gen <name>
+
+# Scintillation time templates: two exponential components with decay times t1, t2 (ns) and amplitudes a1, a2.
+# A scintillation photon belongs to the first component with probability a1 t1 / (a1 t1 + a2 t2).
+# t2 = 0 means a single component. `crystal:` in each data config picks one entry.
+crystals:
+  pwo: {t1_ns: 7.5, a1: 1.0, t2_ns: 0.0, a2: 0.0}
+  bso: {t1_ns: 22.0, a1: 0.054, t2_ns: 98.0, a2: 0.087}
+  bgo: {t1_ns: 50.0, a1: 0.044, t2_ns: 320.0, a2: 0.093}
+
+# Cherenkov time template: prompt, one short exponential.
+cherenkov:
+  decay_ns: 0.1
+
+signal:
+  onset_ns: -100.0            # arrival time of the first photons before the response delay, for t0 = 0
+
+# Where C and S come from.
+#   random: integers, uniform and independent, C in 0..c_max, S in 0..s_max (the paper's)
+#   root:   per entry of a ROOT tree; replace this section by
+#           {kind: root, file: <.root>, tree: <name>, c_branch: <b>, c_factor: <x>, s_branch: <b>, s_factor: <x>,
+#            t0_branch: <b> or null}; C = rint(c_branch * c_factor), S likewise, t0 in ns or drawn as below
+# The labels are exactly the numbers of photons put into the waveform.
+source:
+  kind: random
+  c_max: 1500
+  s_max: 900
+
+t0:
+  half_width_ns: 2.5          # per-event time offset, uniform in +-half_width, added to every signal photon
+
+# Digitisation window. The number of samples is int((t_last - t_first) / dt) = 6246.
+window:
+  t_first_ns: -400.0
+  t_last_ns: 1599.0
+  dt_ns: 0.32
+
+sipm:
+  unit: mV                    # waveform unit (README.md: how sure)
+  spe_amplitude: 3.621        # peak amplitude of one photoelectron (6x6 mm2 SiPM, 28 dB front-end gain)
+  response:                   # measured single-photoelectron response (laser calibration run 477)
+    file: templates/spr_laser_run477.csv    # relative to data/dro_gen; columns time_ns, amplitude
+    t_start_ns: 0.0           # the response used is the template from this time on ...
+    n_samples: 10000          # ... sampled at window.dt_ns; beyond the template's end its last value is held
+    drop_last: 10             # the last samples of the template file are not used
+
+# Sensor and electronics effects ("realistic"). The ideal configs set all four to 0.
+noise:
+  dark_rate_hz: 10000000.0    # dark counts: Poisson number over the window, uniform in time
+  spe_sigma: 0.10             # relative spread of the single-photoelectron amplitude, Normal(1, spe_sigma) per photon
+  crosstalk: 0.07             # probability that an avalanche fires one extra cell (signal and dark); not in the labels
+  electronic_spe: 0.10        # white Gaussian noise on every sample, r.m.s. in units of spe_amplitude
+
+run:
+  n: 100000                   # number of rows of the source, before the C == 0 / S == 0 filter
+  seed: 20261118              # chunk k uses numpy default_rng([seed, k]): rows do not depend on the number of workers
+  chunk: 500                  # rows per chunk; changing it changes the random stream
+
+split:
+  heldout_frac: 0.2           # original rows >= round((1 - heldout_frac) * n) are heldout, the others dev

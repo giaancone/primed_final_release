@@ -1,0 +1,6 @@
+# Control: the paper method without the transformer: features are the token mean of the tokenizer and adapter.
+# What the blocks contribute at all is the difference to paper/dro.yaml.
+defaults: dro.yaml
+stages: [ssl, ridge]
+model:
+  blocks: none

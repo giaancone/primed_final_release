@@ -1,0 +1,8 @@
+# BGO, random C and S, ideal sensor: the realistic set with every sensor and electronics effect off (no dark
+# counts, every photoelectron exactly one spe_amplitude, no crosstalk, no white noise). Same seed and draws.
+defaults: _base.yaml
+crystal: bgo
+noise: {dark_rate_hz: 0.0, spe_sigma: 0.0, crosstalk: 0.0, electronic_spe: 0.0}
+out: /path/to/wavefm-data/dro_gen/bgo_ideal
+# BGO is about 5.7 times brighter in scintillation light than BSO, so the scintillation range is wider.
+source: {s_max: 5100}

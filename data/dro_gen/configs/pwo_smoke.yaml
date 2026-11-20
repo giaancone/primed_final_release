@@ -1,0 +1,7 @@
+# A small pwo_realistic for smoke tests: the same generator, parameters and random stream, only the first 2500 source
+# rows (dev: rows < 2000, heldout: the rest, then the C == 0 / S == 0 filter). Not a problem to report results on.
+defaults: _base.yaml
+crystal: pwo
+run:
+  n: 2500
+out: /path/to/wavefm-data/dro_gen/pwo_smoke

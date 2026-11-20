@@ -1,0 +1,11 @@
+# PWO, random C and S, realistic sensor effects (dark counts, photoelectron gain spread, crosstalk, white noise):
+# the DRO data set of the paper.
+defaults: _base.yaml
+crystal: pwo
+out: /path/to/wavefm-data/dro_gen/pwo_realistic
+
+# Digests (data/store.py) of the unfiltered 100 000 rows of the paper file PWO_real3_100k, measured on that file:
+# build.py refuses to write anything else.
+expect:
+  waveform_sha256: 9fba38ec78591f35cce42e27438c1393a64c8f4bd21ed71b8c6744fa1948c51e
+  labels_sha256: 8add3f6b1ab74da267cf225f260598fb88661f4d045768c65ec37cd046c98651

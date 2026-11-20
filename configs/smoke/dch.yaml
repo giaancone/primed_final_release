@@ -1,0 +1,29 @@
+# Smoke test of paper/dch.yaml: the whole pipeline on the small data set pion_smoke with real pretrained weights, every
+# trained stage 20 steps or fewer. Shows that the code runs end to end; its numbers are not results (run.smoke).
+defaults: ../paper/dch.yaml
+run:
+  smoke: true
+data:
+  config: pion_smoke
+stages: [ssl, ridge, student, compress]
+
+ssl:
+  epochs: 0
+  steps: 20
+  keep: last
+  eval_every: 0
+  eval_points: 5
+  compile: false
+
+student:
+  steps: 20
+  batch_size: 64
+  keep: last
+  eval_every: 0
+  eval_points: 5
+  compile: false
+
+compress:
+  prune_steps: 10
+  steps: 10
+  batch_size: 64

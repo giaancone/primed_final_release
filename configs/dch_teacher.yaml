@@ -1,0 +1,11 @@
+# DCH, 2-layer method: TimesFM 2.5, the last two blocks, count head + per-sample 3-class head (PRIMED's ftpc scheme).
+# The rate and the length are not tuned on this data set: scan them once (configs/scans_dev/README.md), then fix them here.
+defaults: teacher.yaml
+task: dch
+data:
+  set: dch_wf
+  config: pion
+stages: [finetune]
+finetune:
+  epochs: 10
+  batch_size: 64

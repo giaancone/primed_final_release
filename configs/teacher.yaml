@@ -1,0 +1,137 @@
+# Every key a run may set, with its default. A config inherits this file (defaults: teacher.yaml) and overrides
+# keys; a key that is not here is an error (utils/config.check), so a typo never becomes a silent default.
+# The defaults are the plainest choice. What the paper uses instead is switched on in configs/paper/.
+
+task: dro                    # dro | dch: the head, the loss and the targets of the supervised stages
+seed: 0                      # one seed repeats the whole pipeline: which rows are labelled, the train / validation
+                             # cut, every initialisation and every batch order
+run:
+  group: default             # <output>/<group>/<name>/<stage>/
+  name: unnamed
+  smoke: false               # a few steps to see that the code runs: never enters a summary
+  deadline: null             # unix time at which a stage checkpoints and exits (set by run_scan from the allocation)
+
+data:
+  set: dro_gen               # data/<set>/
+  config: pwo_realistic      # data/<set>/configs/<config>.yaml
+  label_frac: 1.0            # fraction of dev whose labels may be used, validation rows included
+  val_frac: 0.1              # of the labelled rows: validation inside the label budget
+  min_labelled: 32
+  min_val: 8
+
+stages: [finetune]           # run in order, each names a section below. What a stage takes from the one before:
+                             # ridge and finetune the encoder weights of ssl; student the teacher labels of ridge;
+                             # compress the student weights (and the teacher labels as targets)
+
+# ---- the model: shared by every stage that uses the encoder ---------------------------------------------------------
+model:
+  kind: timesfm              # timesfm | cnn (cnn: finetune stage only, task dro only)
+  version: "2.5"             # "2.5" | "3.0"
+  blocks: pretrained         # pretrained | random (control: nothing pretrained, blocks frozen at their random
+                             # initialisation) | none (control: the transformer is skipped)
+                             # random and none are for ssl + ridge; with finetune.train_layers != 0 they are refused
+  scaling: global_minmax     # model-level input scaling:
+                             #   global_minmax  one minimum and maximum, those of the dev waveforms (dev meta.json)
+                             #   native         TimesFM's causal per-patch scaling of the raw waveform
+                             #   native_stats   the same, and the head also gets the waveform mean and spread
+                             #   trace_native   each waveform standardised, then TimesFM's causal per-patch scaling
+  adapter: false             # zero-initialised conv3 residual adapter after the tokenizer
+  widths: [32, 64, 128]      # cnn
+  head_hidden: 128           # finetune head
+
+# ---- training dynamics: the same keys in every trained stage --------------------------------------------------------
+# Default: constant rate, no warm-up, a fixed number of steps, the last weights. Everything else is an advanced
+# option that a config switches on explicitly. Exactly one of steps / epochs is positive.
+# `dynamics` is only the YAML template of the stage sections below and is dropped when the file is loaded: set the
+# keys in the stage section (ssl.batch_size, not dynamics.batch_size, which is rejected as an unknown key).
+dynamics: &dynamics
+  steps: 0                   # number of optimiser steps ...
+  epochs: 0                  # ... or passes over the training rows of the stage (a rule that follows the row count)
+  batch_size: 32
+  weight_decay: 0.01
+  grad_clip: 1.0
+  schedule: constant         # constant | cosine | plateau (advanced)
+  warmup_frac: 0.0           # linear warm-up over this fraction of the steps
+  final_lr_frac: 0.0         # cosine: rate at the end, as a fraction of the starting rate
+  patience: 10               # plateau: evaluations without a better validation loss before the rate drops
+  lr_factor: 0.3             # plateau
+  max_reductions: 2          # plateau: rate drops before the next plateau ends the run (early stopping)
+  keep: last                 # last | best_val (a checkpoint method: the step with the lowest validation loss)
+                             # ssl has no validation set: best_val and plateau are refused there
+  eval_points: 30            # evaluations of the validation loss along the run, equally spaced
+  eval_every: 0              # > 0: evaluate every so many steps instead (plateau needs a fixed interval)
+  eval_batch: 128            # rows per validation forward pass; ssl has no validation, so it is unused there
+  compile: true              # torch.compile: faster, same function
+  ckpt_minutes: 20           # resume checkpoint interval (resuming is exact and is not a checkpoint method)
+
+# ---- stage: supervised fine-tuning (the 2-layer method and the CNN baseline) ----------------------------------------
+finetune:
+  <<: *dynamics
+  train_layers: 2            # trained transformer blocks from the top, -1 = all
+  train_tokenizer: false
+  lr_backbone: 1.0e-4        # last block; earlier blocks x layer_decay per block
+  layer_decay: 1.0
+  lr_tokenizer: 1.0e-4       # explicit, not tied to lr_backbone
+  lr_adapter: 1.0e-4
+  lr_head: 1.0e-3            # also the single rate of the CNN
+  target_scaling: standard   # standard (mean and spread of the labelled training rows) | divisor
+  divisors: null
+  loss_weights: null         # dro: per-target weights of the squared error, null = equal
+  ce_weight: 1.0             # dch: cross entropy of the per-sample classes
+  count_weight: 1.0          # dch: squared error of the count
+  class_weighted: true       # dch: inverse-frequency class weights
+  augment_shift: 0           # dro: random time shift of a training waveform by up to this many samples; 0 = off
+
+# ---- stage: label-free training of the tokenizer and the adapter (all dev waveforms, no labels) ---------------------
+ssl:
+  <<: *dynamics
+  batch_size: 16
+  lr_tokenizer: 1.0e-4
+  lr_adapter: 1.0e-4
+  lr_heads: 1.0e-3           # the two temporary linear heads and the mask token; they are not passed on
+  mask_prob: 0.25            # each patch is masked independently with this probability
+  next_weight: 1.0           # next-patch prediction
+  masked_weight: 1.0         # masked-patch reconstruction
+  target_space: input        # space of the targets and of the mask token:
+                             #   input   the encoder's own scaled patches
+                             #   zscore  the waveform standardised with the dev mean and spread (dev meta.json)
+
+# ---- stage: closed-form ridge on frozen features ---------------------------------------------------------------------
+ridge:
+  block: -1                  # features: token mean of this block's output (-1 = last)
+  standardise_on: labelled   # rows that give the feature mean and spread: labelled | dev (features need no labels)
+  log10_alpha_min: -8.0      # the grid of alpha; chosen per output by closed-form leave-one-out on the labelled rows
+  log10_alpha_max: 5.0
+  alphas_per_decade: 2
+  batch_size: 128            # feature extraction
+
+# ---- stage: the small student ---------------------------------------------------------------------------------------
+student:
+  <<: *dynamics
+  batch_size: 1024
+  weight_decay: 0.0
+  targets: teacher           # teacher (distillation: teacher labels of dev rows) | truth (from scratch: labelled rows)
+  hidden: [16, 24, 8]
+  pad_to: 6246               # waveform padded to this length by repeating its last sample, then ...
+  every: 10                  # ... every n-th sample kept, then ...
+  n_in: 640                  # ... padded to the input width by repeating the last kept sample
+  input_scaling: dev_minmax  # dev_minmax (minimum and maximum of the dev waveforms) | kept_minmax (of the kept
+                             # samples of the student's training rows)
+  target_scaling: standard   # standard (mean and spread of the training targets) | divisor
+  divisors: null
+  loss_weights: null         # per-output weights of the squared error, null = equal
+  output_bias: zero          # zero | mean (the last bias starts at the mean scaled target)
+  lr: 1.0e-2
+
+# ---- stage: pruning and quantisation-aware training (compression environment, QKeras) -------------------------------
+# Fixed rules, not keys: targets are the teacher labels in the student's output scaling, squared error, Adam,
+# constant rate, the student's training and validation rows, the last weights.
+compress:
+  kernel: null               # one QKeras quantizer string per layer, e.g. "quantized_po2(10)"
+  bias: null                 # one quantizer string for every bias
+  activation: null           # one quantizer string for every hidden activation
+  sparsity: null             # fraction of pruned weights per layer, 0 = not pruned
+  prune_steps: 0             # steps of pruning with the float weights
+  steps: 0                   # steps of quantisation-aware training; 0 = quantise the pruned weights without training
+  batch_size: 1024
+  lr: 1.0e-4
